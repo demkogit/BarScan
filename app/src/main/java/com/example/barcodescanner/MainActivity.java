@@ -3,50 +3,70 @@ package com.example.barcodescanner;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.AsyncTask;
+import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 
-import org.json.JSONException;
-
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import org.w3c.dom.Text;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements ProductAdapter.OnItemClickListener, DeleteDialog.IDeleteItem {
 
-    private ImageButton scanBtn;
-    private TextView codeView, charView, nameView, partyView;
+    private static final String TAG = "myLogs";
+    final int REQUEST_CODE_CREATE_PRODUCT = 1;
+    final int REQUEST_CODE_SCAN = 2;
+    RecyclerView recyclerView;
+    ProductAdapter adapter;
+    List<ProductItem> productItemList;
+    private ImageButton scanBtn, saveBtn, createDocBtn, createProductBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        codeView = findViewById(R.id.code);
-        nameView = findViewById(R.id.name);
-        charView = findViewById(R.id.charateristic);
-        partyView = findViewById(R.id.party);
+        init();
+        String data = readData();
+        importData(data);
+
+        new ServerAsyncTask().execute("GET", "test", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/getInfo?id=0");
+    }
+
+    private void init() {
+        final Activity mActivity = this;
+        productItemList = new ArrayList<>();
+        recyclerView = findViewById(R.id.recyclerView);
+        recyclerView.setHasFixedSize(true);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+        adapter = new ProductAdapter(MainActivity.this, productItemList, this, MainActivity.this);
+        recyclerView.setAdapter(adapter);
 
         scanBtn = (ImageButton) findViewById(R.id.scanButton);
-        final Activity mActivity = this;
         scanBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -56,104 +76,76 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+
+        saveBtn = findViewById(R.id.saveDataBtn);
+        saveBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                saveData();
+            }
+        });
+
+        createDocBtn = findViewById(R.id.createDocBtn);
+        createDocBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(mActivity, "Создание документа инвентаризации...", Toast.LENGTH_SHORT).show();
+                String jsonArray = createDoc();
+                //new JSONAsyncTask().execute("http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createDoc", "CreateDoc", jsonArray);
+                new ServerAsyncTask().execute("post", "createDoc", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createDoc", jsonArray);
+            }
+        });
+        final Intent createProductIntent = new Intent(this, CreateProductActivity.class);
+        createProductBtn = findViewById(R.id.createProductBtn);
+        createProductBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivityForResult(createProductIntent, REQUEST_CODE_CREATE_PRODUCT);
+                //new ServerAsyncTask().execute("post", "createProduct", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createProduct");
+            }
+        });
+
+    }
+
+    @Override
+    public void onItemClick(final int position) {
+        DeleteDialog dialog = new DeleteDialog();
+        dialog.show(getSupportFragmentManager(), "deleteDialog");
+        Bundle args = new Bundle();
+        args.putInt("position", position);
+        dialog.setArguments(args);
+    }
+
+    @Override
+    public void deleteItem(int position) {
+        productItemList.remove(position);
+        adapter.notifyDataSetChanged();
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
 
-        if (result != null) {
-            if (result.getContents() != null) {
-                new JSONAsyncTask().execute("http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/getInfo?id=" + result.getContents());
+        if (resultCode == RESULT_OK) {
+            if (requestCode == REQUEST_CODE_CREATE_PRODUCT) {
+                String product_name = data.getStringExtra("name");
+                String product_code = data.getStringExtra("code");
+                product_name = product_name.trim().replace(' ', '_');
+                product_code = product_code.trim().replace(' ', '_');
+                new ServerAsyncTask().execute("POST", "addProduct", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/addProduct?name=" + product_name + "&code=" + product_code);
+                Toast.makeText(this, product_code + '\n' + product_name, Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "canceled", Toast.LENGTH_LONG).show();
+                //Log.d(TAG, "Ок");
+                IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+                if (result != null) {
+                    //Log.d(TAG, "Ок");
+                    if (result.getContents() != null) {
+                        //Log.d(TAG, "Ок");
+                        new ServerAsyncTask().execute("GET", "getInfo", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/getInfo?id=" + result.getContents());
+                    }
+                }
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data);
-        }
-
-    }
-
-    public class JSONAsyncTask extends AsyncTask<String, Void, String> {
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-        }
-
-        @Override
-        protected void onPostExecute(String s) {
-            super.onPostExecute(s);
-
-            if(s.equals("0")) {
-                Toast.makeText(MainActivity.this, "Отсутствует соединение с сервисом(", Toast.LENGTH_LONG).show();
-            }
-            else if (s != null){
-                Object obj = null; // Object obj = new JSONParser().parse(new FileReader("JSONExample.json"));
-                try {
-                    obj = new JSONParser().parse(s);
-                } catch (ParseException e) {
-                    e.printStackTrace();
-                }
-
-                // Кастим obj в JSONObject
-                JSONObject jo = (JSONObject) obj;
-                String id = null;
-                String name = null;
-                String characteristic = null;
-                String party = null;
-                String error = (String) jo.get("error");
-
-                if (error.equals("false")) {
-                    id = (String) jo.get("id");
-                    name = (String) jo.get("name");
-                    characteristic = (String) jo.get("characteristic");
-                    party = (String) jo.get("party");
-                } else {
-                    id = "Error";
-                    name = (String) jo.get("msg");
-                }
-
-                codeView.setText(id);
-                nameView.setText(name);
-                charView.setText(characteristic);
-                partyView.setText(party);
-            }
-
-        }
-
-        @Override
-        protected String doInBackground(String... urls) {
-            URL url;
-            HttpURLConnection urlConnection = null;
-            String server_response = null;
-            try {
-                url = new URL(urls[0]);
-                urlConnection = (HttpURLConnection) url.openConnection();
-
-                urlConnection.setRequestMethod("GET");
-                urlConnection.setRequestProperty("Authorization", "Basic V2ViQXBpOjEyMzQ1");
-
-                int responseCode = urlConnection.getResponseCode();
-
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    server_response = readStream(urlConnection.getInputStream());
-                    Log.v("CatalogClient", server_response);
-                }else {
-                    Toast.makeText(MainActivity.this, "Ошибка: " + responseCode, Toast.LENGTH_LONG).show();
-                }
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-
-            } catch (IOException e) {
-                server_response = "0";
-                e.printStackTrace();
-            }finally {
-                if(urlConnection!=null){
-                    urlConnection.disconnect();
-                }
-            }
-
-            return server_response;
         }
     }
 
@@ -179,5 +171,421 @@ public class MainActivity extends AppCompatActivity {
         }
         return response.toString();
     }
+
+    private void addProduct(ProductItem product) {
+
+        if (productExist(product)) {
+            Toast.makeText(MainActivity.this, "Данный товар уже находится в списке товаров!", Toast.LENGTH_LONG).show();
+        } else {
+            productItemList.add(product);
+            adapter.notifyDataSetChanged();
+            Toast.makeText(MainActivity.this, "Товар успешно добавлен!", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private boolean productExist(ProductItem product) {
+        String code = product.getCode();
+        for (ProductItem item : productItemList) {
+            if (code.equals(item.getCode())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void saveData() {
+        JSONArray array = new JSONArray();
+
+        for (ProductItem item : productItemList) {
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("id", item.getCode());
+            jsonObject.put("name", item.getName());
+            jsonObject.put("count", item.getCount());
+            jsonObject.put("party", item.getParty());
+            array.add(jsonObject);
+        }
+        try {
+            FileOutputStream fileOutput = openFileOutput("data.txt", MODE_PRIVATE);
+            fileOutput.write(array.toString().getBytes());
+            Toast.makeText(MainActivity.this, "Сохранено", Toast.LENGTH_SHORT).show();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String readData() {
+        String result = null;
+        try {
+            FileInputStream fileInput = openFileInput("data.txt");
+            InputStreamReader reader = new InputStreamReader(fileInput);
+            BufferedReader buffer = new BufferedReader(reader);
+            StringBuffer strBuffer = new StringBuffer();
+            String line = "";
+            while ((line = buffer.readLine()) != null) {
+                strBuffer.append(line);
+            }
+
+            //Toast.makeText(MainActivity.this, strBuffer.toString(), Toast.LENGTH_LONG).show();
+            result = strBuffer.toString();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    private String createDoc() {
+        JSONArray array = new JSONArray();
+        for (ProductItem item : productItemList) {
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("id", item.getCode());
+            jsonObject.put("name", item.getName());
+            jsonObject.put("count", item.getCount());
+            jsonObject.put("party", item.getParty());
+            array.add(jsonObject);
+        }
+        Toast.makeText(MainActivity.this, array.toString(), Toast.LENGTH_SHORT).show();
+        return array.toString();
+    }
+
+    private void importData(String data) {
+        productItemList.clear();
+        adapter.notifyDataSetChanged();
+
+        Object obj = null;
+        try {
+            obj = new JSONParser().parse(data);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+
+        JSONArray array = (JSONArray) obj;
+
+        for (int i = 0; i < array.size(); i++) {
+            JSONObject jsonObject = (JSONObject) array.get(i);
+            String id = null;
+            String name = null;
+            String party = null;
+            String count = null;
+            id = (String) jsonObject.get("id");
+            name = (String) jsonObject.get("name");
+            party = (String) jsonObject.get("party");
+            count = (String) jsonObject.get("count");
+            productItemList.add(new ProductItem(id, name, party, count));
+        }
+
+    }
+
+    public class JSONAsyncTask extends AsyncTask<String, Void, String> {
+
+        String type_of_request;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+            switch (this.type_of_request) {
+                case "getInfo":
+                    getInfo(s);
+                    break;
+                case "test":
+                    test(s);
+                    break;
+                case "createDoc":
+                    createDocReply(s);
+            }
+        }
+
+        private void test(String data) {
+            if (data.equals("0")) {
+                Toast.makeText(MainActivity.this, "Отсутствует соединение с сервисом(", Toast.LENGTH_LONG).show();
+            }
+        }
+
+        private void getInfo(String data) {
+
+            if (data.equals("0")) {
+                Toast.makeText(MainActivity.this, "Отсутствует соединение с сервисом(", Toast.LENGTH_LONG).show();
+            } else if (data != null) {
+                Object obj = null;
+                try {
+                    obj = new JSONParser().parse(data);
+                } catch (ParseException e) {
+                    e.printStackTrace();
+                }
+
+                JSONObject jo = (JSONObject) obj;
+                String id = null;
+                String name = null;
+                String characteristic = null;
+                String party = null;
+                String error = (String) jo.get("error");
+
+                if (error.equals("false")) {
+                    id = (String) jo.get("id");
+                    name = (String) jo.get("name");
+                    characteristic = (String) jo.get("characteristic");
+                    party = (String) jo.get("party");
+
+                    addProduct(new ProductItem(id, name, party, "1"));
+                    saveData();
+
+                } else {
+                    type_of_request = "addProduct";
+                    Toast.makeText(MainActivity.this, "" + jo.get("msg"), Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+
+        private void createDocReply(String data) {
+            if (data.equals("0")) {
+                Toast.makeText(MainActivity.this, "Отсутствует соединение с сервисом(", Toast.LENGTH_LONG).show();
+            } else if (data != null) {
+                Toast.makeText(MainActivity.this, data.toString(), Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        @Override
+        protected String doInBackground(String... urls) {
+
+            type_of_request = urls[1];
+            URL url;
+            HttpURLConnection urlConnection = null;
+            String server_response = null;
+            if (type_of_request.equals("createDoc")) {
+                try {
+                    url = new URL(urls[0]);
+                    urlConnection = (HttpURLConnection) url.openConnection();
+
+                    urlConnection.setRequestMethod("POST");
+                    urlConnection.setRequestProperty("Authorization", "Basic V2ViQXBpOjEyMzQ1");
+                    urlConnection.setRequestProperty("JSON", urls[2]);
+                    int responseCode = urlConnection.getResponseCode();
+
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        server_response = readStream(urlConnection.getInputStream());
+                        //Log.v("CreateDoc", server_response);
+                    } else {
+                        Toast.makeText(MainActivity.this, "Ошибка: " + responseCode, Toast.LENGTH_LONG).show();
+                    }
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+
+                } catch (IOException e) {
+                    server_response = "0";
+                    e.printStackTrace();
+                } finally {
+                    if (urlConnection != null) {
+                        urlConnection.disconnect();
+                    }
+                }
+            } else {
+                try {
+                    url = new URL(urls[0]);
+                    urlConnection = (HttpURLConnection) url.openConnection();
+
+                    urlConnection.setRequestMethod("GET");
+                    urlConnection.setRequestProperty("Authorization", "Basic V2ViQXBpOjEyMzQ1");
+
+                    int responseCode = urlConnection.getResponseCode();
+
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        server_response = readStream(urlConnection.getInputStream());
+                        //Log.v("CatalogClient", server_response);
+                    } else {
+                        Toast.makeText(MainActivity.this, "Ошибка: " + responseCode, Toast.LENGTH_LONG).show();
+                    }
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+
+                } catch (IOException e) {
+                    server_response = "0";
+                    e.printStackTrace();
+                } finally {
+                    if (urlConnection != null) {
+                        urlConnection.disconnect();
+                    }
+                }
+            }
+            return server_response;
+        }
+    }
+
+
+    public class ServerAsyncTask extends AsyncTask<String, Void, String> {
+
+        String type_of_request;
+
+        @Override
+        protected void onPostExecute(String data) {
+            super.onPostExecute(data);
+            switch (type_of_request) {
+                case "getInfo":
+                    getInfo(data);
+                    break;
+                case "test":
+                    test(data);
+                    break;
+                case "createDoc":
+                    createDoc(data);
+                    break;
+                case "addProduct":
+                    addProductReply(data);
+                    break;
+            }
+        }
+
+        private void addProductReply(String data) {
+            Log.d(TAG, "addProductReply " + data);
+            if (data != null) {
+                if (data.equals("0")) {
+                    Toast.makeText(MainActivity.this, "Отсутствует соединение с сервисом(", Toast.LENGTH_LONG).show();
+                } else {
+                    Object obj = null;
+                    try {
+                        obj = new JSONParser().parse(data);
+                    } catch (ParseException e) {
+                        e.printStackTrace();
+                    }
+
+                    JSONObject jo = (JSONObject) obj;
+                    String msg = (String) jo.get("msg");
+                    Toast.makeText(MainActivity.this, "" + jo.get("msg"), Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+
+        @Override
+        protected String doInBackground(String... params) {
+
+            type_of_request = params[1];
+            URL url;
+            HttpURLConnection urlConnection = null;
+            String server_response = null;
+
+            Log.d(TAG, "doInBackground");
+            try {
+                url = new URL(params[2]);
+                urlConnection = (HttpURLConnection) url.openConnection();
+                urlConnection.setRequestMethod(params[0]);
+                if (params[0].toLowerCase().equals("POST")) {
+                    urlConnection.setRequestProperty("Type", type_of_request);
+                    urlConnection.setRequestProperty("JSON", params[3]);
+                }
+                urlConnection.setRequestProperty("Authorization", "Basic V2ViQXBpOndlYmFwaQ==");
+                Log.d(TAG, "Authorization");
+                int responseCode = urlConnection.getResponseCode();
+
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    Log.d(TAG, "Response code: " + responseCode);
+                    server_response = readStream(urlConnection.getInputStream());
+                } else {
+                    //Toast.makeText(MainActivity.this, "Ошибка: " + responseCode, Toast.LENGTH_LONG).show();
+                    Log.d(TAG, "Ошибка: " + responseCode);
+                }
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+
+            } catch (IOException e) {
+                server_response = "0";
+                e.printStackTrace();
+            } finally {
+                if (urlConnection != null) {
+                    urlConnection.disconnect();
+                }
+            }
+
+            return server_response;
+        }
+
+        private void getInfo(String data) {
+            if (data != null) {
+                if (data.equals("0")) {
+                    Toast.makeText(MainActivity.this, "Отсутствует соединение с сервисом(", Toast.LENGTH_LONG).show();
+                } else {
+                    Object obj = null;
+                    try {
+                        obj = new JSONParser().parse(data);
+                    } catch (ParseException e) {
+                        e.printStackTrace();
+                    }
+
+                    JSONObject jo = (JSONObject) obj;
+                    String id = null;
+                    String name = null;
+                    String characteristic = null;
+                    String party = null;
+                    String error = (String) jo.get("error");
+
+                    if (error.equals("false")) {
+                        id = (String) jo.get("id");
+                        name = (String) jo.get("name");
+                        characteristic = (String) jo.get("characteristic");
+                        party = (String) jo.get("party");
+
+                        addProduct(new ProductItem(id, name, party, "1"));
+                        saveData();
+
+                    } else {
+                        type_of_request = "addProduct";
+                        Toast.makeText(MainActivity.this, "" + jo.get("msg"), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        }
+
+        private void createDoc(String data) {
+            if (data.equals("0")) {
+                Toast.makeText(MainActivity.this, "Отсутствует соединение с сервисом(", Toast.LENGTH_LONG).show();
+            } else if (data != null) {
+                Toast.makeText(MainActivity.this, data.toString(), Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        private void createProductReply(String data) {
+
+        }
+
+        private void test(String data) {
+            if (data != null) {
+                if (data.equals("0")) {
+                    Toast.makeText(MainActivity.this, "Отсутствует соединение с сервисом(", Toast.LENGTH_LONG).show();
+                }
+            }
+        }
+
+        private String readStream(InputStream in) {
+            BufferedReader reader = null;
+            StringBuffer response = new StringBuffer();
+            try {
+                reader = new BufferedReader(new InputStreamReader(in));
+                String line = "";
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (reader != null) {
+                    try {
+                        reader.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            return response.toString();
+        }
+    }
+
+
 }
 

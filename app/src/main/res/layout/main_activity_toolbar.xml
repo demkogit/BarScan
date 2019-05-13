@@ -5,6 +5,34 @@
     android:layout_height="wrap_content"
     app:theme="@style/CustomToolbarStyle">
 
+
+    <ImageButton
+        android:id="@+id/createDocBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="50dp"
+        android:adjustViewBounds="true"
+        android:background="@null"
+        android:scaleType="fitStart"
+        android:src="@drawable/create_doc_btn_img" />
+
+    <ImageButton
+        android:id="@+id/saveDataBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="50dp"
+        android:adjustViewBounds="true"
+        android:background="@null"
+        android:scaleType="fitStart"
+        android:src="@drawable/save_data_btn_img" />
+
+    <ImageButton
+        android:id="@+id/createProductBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="50dp"
+        android:adjustViewBounds="true"
+        android:background="@null"
+        android:scaleType="fitStart"
+        android:src="@drawable/create_product_btn_img" />
+
     <ImageButton
         android:id="@+id/scanButton"
         android:layout_width="wrap_content"
@@ -14,5 +42,6 @@
         android:background="@null"
         android:src="@drawable/scan_button_image"
         android:textSize="12sp" />
+
 
 </android.support.v7.widget.Toolbar>
