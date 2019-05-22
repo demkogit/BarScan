@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="10dp"
+    tools:context=".CreateProductActivity">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Логин:"
+        android:textColor="#000"
+        android:textSize="25dp" />
+
+    <EditText
+        android:id="@+id/login"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Логин"
+        android:textSize="10pt" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Пароль:"
+        android:textColor="#000"
+        android:textSize="25dp" />
+
+    <EditText
+        android:id="@+id/pass"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Пароль"
+        android:imeOptions="actionDone"
+        android:inputType="textPassword"
+        android:maxLines="1"
+        android:singleLine="true"
+        android:textSize="10pt"
+        android:saveEnabled="false"/>
+
+    <Button
+        android:id="@+id/saveLogPass"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Сохранить" />
+
+</LinearLayout>

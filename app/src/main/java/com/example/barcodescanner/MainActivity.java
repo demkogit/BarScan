@@ -1,7 +1,9 @@
 package com.example.barcodescanner;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
@@ -9,8 +11,10 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.PopupMenu;
 import android.widget.Toast;
 
 import com.google.zxing.integration.android.IntentIntegrator;
@@ -37,12 +41,19 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity implements ProductAdapter.OnItemClickListener, DeleteDialog.IDeleteItem {
 
     private static final String TAG = "myLogs";
+    public static final String APP_PREFERENCES = "settings";
+    public static final String APP_PREFERENCES_BASIC = "basic";
     final int REQUEST_CODE_CREATE_PRODUCT = 1;
     final int REQUEST_CODE_SCAN = 2;
+    final int REQUEST_CODE_SETTINGS = 3;
+    private SharedPreferences mSettings;
+
+
     RecyclerView recyclerView;
     ProductAdapter adapter;
     List<ProductItem> productItemList;
-    private ImageButton scanBtn, saveBtn, createDocBtn, createProductBtn;
+    private ImageButton scanBtn, saveBtn, createDocBtn, createProductBtn, settingsBtn;
+    private String mAuth;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +69,9 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
 
     private void init() {
         final Activity mActivity = this;
+
+        mSettings = getSharedPreferences(APP_PREFERENCES, Context.MODE_PRIVATE);
+
         productItemList = new ArrayList<>();
         recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setHasFixedSize(true);
@@ -77,34 +91,77 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
         });
 
 
-        saveBtn = findViewById(R.id.saveDataBtn);
-        saveBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                saveData();
-            }
-        });
+//        saveBtn = findViewById(R.id.saveDataBtn);
+//        saveBtn.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                saveData();
+//            }
+//        });
 
         createDocBtn = findViewById(R.id.createDocBtn);
         createDocBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(mActivity, "Создание документа инвентаризации...", Toast.LENGTH_SHORT).show();
+                Toast.makeText(mActivity, mAuth, Toast.LENGTH_SHORT).show();
                 String jsonArray = createDoc();
                 //new JSONAsyncTask().execute("http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createDoc", "CreateDoc", jsonArray);
                 new ServerAsyncTask().execute("post", "createDoc", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createDoc", jsonArray);
             }
         });
-        final Intent createProductIntent = new Intent(this, CreateProductActivity.class);
-        createProductBtn = findViewById(R.id.createProductBtn);
-        createProductBtn.setOnClickListener(new View.OnClickListener() {
+//        final Intent createProductIntent = new Intent(this, CreateProductActivity.class);
+//        createProductBtn = findViewById(R.id.createProductBtn);
+//        createProductBtn.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                startActivityForResult(createProductIntent, REQUEST_CODE_CREATE_PRODUCT);
+//                //new ServerAsyncTask().execute("post", "createProduct", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createProduct");
+//            }
+//        });
+
+        settingsBtn = findViewById(R.id.settingsBtn);
+        settingsBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startActivityForResult(createProductIntent, REQUEST_CODE_CREATE_PRODUCT);
-                //new ServerAsyncTask().execute("post", "createProduct", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createProduct");
+                showPopupMenu(v);
             }
         });
 
+    }
+
+    private void showPopupMenu(View v) {
+        PopupMenu popupMenu = new PopupMenu(this, v);
+        popupMenu.inflate(R.menu.menu_main);
+
+        final Intent createProductIntent = new Intent(this, CreateProductActivity.class);
+        final Intent settingsIntent = new Intent(this, SettingsActivity.class);
+        popupMenu
+                .setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                    @Override
+                    public boolean onMenuItemClick(MenuItem item) {
+                        switch (item.getItemId()) {
+                            case R.id.settings:
+                                startActivityForResult(settingsIntent, REQUEST_CODE_SETTINGS);
+                                return true;
+                            case R.id.saveData:
+                                saveData();
+                                return true;
+                            case R.id.createProduct:
+                                startActivityForResult(createProductIntent, REQUEST_CODE_CREATE_PRODUCT);
+                                return true;
+                        }
+                        return true;
+                    }
+                });
+
+//        popupMenu.setOnDismissListener(new PopupMenu.OnDismissListener() {
+//            @Override
+//            public void onDismiss(PopupMenu menu) {
+//                Toast.makeText(getApplicationContext(), "onDismiss",
+//                        Toast.LENGTH_SHORT).show();
+//            }
+//        });
+        popupMenu.show();
     }
 
     @Override
@@ -133,6 +190,8 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
                 product_code = product_code.trim().replace(' ', '_');
                 new ServerAsyncTask().execute("POST", "addProduct", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/addProduct?name=" + product_name + "&code=" + product_code);
                 Toast.makeText(this, product_code + '\n' + product_name, Toast.LENGTH_SHORT).show();
+            } else if (resultCode == REQUEST_CODE_SETTINGS) {
+                Toast.makeText(this, "Settings", Toast.LENGTH_SHORT).show();
             } else {
                 //Log.d(TAG, "Ок");
                 IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
@@ -471,6 +530,10 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
             HttpURLConnection urlConnection = null;
             String server_response = null;
 
+            if (mSettings.contains(APP_PREFERENCES_BASIC)) {
+                mAuth = mSettings.getString(APP_PREFERENCES_BASIC, "");
+            }
+
             Log.d(TAG, "doInBackground");
             try {
                 url = new URL(params[2]);
@@ -480,7 +543,7 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
                     urlConnection.setRequestProperty("Type", type_of_request);
                     urlConnection.setRequestProperty("JSON", params[3]);
                 }
-                urlConnection.setRequestProperty("Authorization", "Basic V2ViQXBpOndlYmFwaQ==");
+                urlConnection.setRequestProperty("Authorization", "Basic " + mAuth);
                 Log.d(TAG, "Authorization");
                 int responseCode = urlConnection.getResponseCode();
 
