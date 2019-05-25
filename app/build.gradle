@@ -33,4 +33,8 @@ dependencies {
     implementation 'com.android.support:recyclerview-v7:28.0.0'
     implementation 'com.android.support:cardview-v7:28.0.0'
     implementation 'net.yslibrary.keyboardvisibilityevent:keyboardvisibilityevent:2.3.0'
+    implementation 'org.apache.commons:commons-io:1.3.2'
+    implementation 'commons-codec:commons-codec:1.10'
+    implementation 'com.itextpdf:itextpdf:5.0.6'
+    implementation files('build/sun.misc.base64decoder.jar')
 }

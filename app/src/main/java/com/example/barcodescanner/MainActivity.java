@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
@@ -19,39 +20,45 @@ import android.widget.Toast;
 
 import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
+import com.itextpdf.text.DocumentException;
 
+import org.apache.commons.io.IOUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import Decoder.BASE64Decoder;
+
+
 public class MainActivity extends AppCompatActivity implements ProductAdapter.OnItemClickListener, DeleteDialog.IDeleteItem {
 
-    private static final String TAG = "myLogs";
     public static final String APP_PREFERENCES = "settings";
     public static final String APP_PREFERENCES_BASIC = "basic";
+    private static final String TAG = "myLogs";
     final int REQUEST_CODE_CREATE_PRODUCT = 1;
     final int REQUEST_CODE_SCAN = 2;
     final int REQUEST_CODE_SETTINGS = 3;
-    private SharedPreferences mSettings;
-
-
     RecyclerView recyclerView;
     ProductAdapter adapter;
     List<ProductItem> productItemList;
+    private SharedPreferences mSettings;
     private ImageButton scanBtn, saveBtn, createDocBtn, createProductBtn, settingsBtn;
     private String mAuth;
 
@@ -103,10 +110,10 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
         createDocBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(mActivity, mAuth, Toast.LENGTH_SHORT).show();
+                //Toast.makeText(mActivity, mAuth, Toast.LENGTH_SHORT).show();
                 String jsonArray = createDoc();
                 //new JSONAsyncTask().execute("http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createDoc", "CreateDoc", jsonArray);
-                new ServerAsyncTask().execute("post", "createDoc", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createDoc", jsonArray);
+                new ServerAsyncTask().execute("POST", "createDoc", "http://axiantest.dynvpn.ru:34080/UNF/hs/apiScanner/createDoc", jsonArray);
             }
         });
 //        final Intent createProductIntent = new Intent(this, CreateProductActivity.class);
@@ -425,12 +432,26 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
                     urlConnection = (HttpURLConnection) url.openConnection();
 
                     urlConnection.setRequestMethod("POST");
-                    urlConnection.setRequestProperty("Authorization", "Basic V2ViQXBpOjEyMzQ1");
-                    urlConnection.setRequestProperty("JSON", urls[2]);
+                    urlConnection.setRequestProperty("Authorization", "Basic " + mAuth);
+                    urlConnection.setConnectTimeout(5000);
+                    urlConnection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                    urlConnection.setDoOutput(true);
+                    urlConnection.setDoInput(true);
+
+                    OutputStream os = urlConnection.getOutputStream();
+                    os.write(urls[3].getBytes("UTF-8"));
+                    os.close();
+
+                    InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+                    String result = org.apache.commons.io.IOUtils.toString(in, "UTF-8");
+
+                    in.close();
+
                     int responseCode = urlConnection.getResponseCode();
 
                     if (responseCode == HttpURLConnection.HTTP_OK) {
-                        server_response = readStream(urlConnection.getInputStream());
+                        //server_response = readStream(urlConnection.getInputStream());
+                        server_response = result;
                         //Log.v("CreateDoc", server_response);
                     } else {
                         Toast.makeText(MainActivity.this, "Ошибка: " + responseCode, Toast.LENGTH_LONG).show();
@@ -482,6 +503,7 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
     public class ServerAsyncTask extends AsyncTask<String, Void, String> {
 
         String type_of_request;
+        byte[] bytes = null;
 
         @Override
         protected void onPostExecute(String data) {
@@ -494,7 +516,13 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
                     test(data);
                     break;
                 case "createDoc":
-                    createDoc(data);
+                    try {
+                        createDoc(data);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (DocumentException e) {
+                        e.printStackTrace();
+                    }
                     break;
                 case "addProduct":
                     addProductReply(data);
@@ -530,6 +558,7 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
             HttpURLConnection urlConnection = null;
             String server_response = null;
 
+
             if (mSettings.contains(APP_PREFERENCES_BASIC)) {
                 mAuth = mSettings.getString(APP_PREFERENCES_BASIC, "");
             }
@@ -541,15 +570,35 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
                 urlConnection.setRequestMethod(params[0]);
                 if (params[0].toLowerCase().equals("POST")) {
                     urlConnection.setRequestProperty("Type", type_of_request);
-                    urlConnection.setRequestProperty("JSON", params[3]);
+                    urlConnection.setConnectTimeout(5000);
+                    urlConnection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                    urlConnection.setDoOutput(true);
+                    urlConnection.setDoInput(true);
                 }
                 urlConnection.setRequestProperty("Authorization", "Basic " + mAuth);
+                String result = null;
+                if (type_of_request.equals("createDoc")) {
+                    Log.d(TAG, "outputStream: ");
+                    OutputStream os = urlConnection.getOutputStream();
+                    os.write(params[3].getBytes("UTF-8"));
+                    os.close();
+
+                    Log.d(TAG, "inputStream: ");
+                    InputStream in = new BufferedInputStream(urlConnection.getInputStream());
+                    result = org.apache.commons.io.IOUtils.toString(in, "UTF-8");
+                    bytes = IOUtils.toByteArray(in);
+                    Log.d(TAG, "inputStream2: " + bytes);
+                    in.close();
+                }
                 Log.d(TAG, "Authorization");
                 int responseCode = urlConnection.getResponseCode();
 
                 if (responseCode == HttpURLConnection.HTTP_OK) {
                     Log.d(TAG, "Response code: " + responseCode);
-                    server_response = readStream(urlConnection.getInputStream());
+                    if (type_of_request.equals("createDoc"))
+                        server_response = result;
+                    else
+                        server_response = readStream(urlConnection.getInputStream());
                 } else {
                     //Toast.makeText(MainActivity.this, "Ошибка: " + responseCode, Toast.LENGTH_LONG).show();
                     Log.d(TAG, "Ошибка: " + responseCode);
@@ -605,11 +654,25 @@ public class MainActivity extends AppCompatActivity implements ProductAdapter.On
             }
         }
 
-        private void createDoc(String data) {
+        public boolean isExternalStorageWritable() {
+            String state = Environment.getExternalStorageState();
+            if (Environment.MEDIA_MOUNTED.equals(state)) {
+                return true;
+            }
+            return false;
+        }
+
+        private void createDoc(String data) throws IOException, DocumentException {
             if (data.equals("0")) {
                 Toast.makeText(MainActivity.this, "Отсутствует соединение с сервисом(", Toast.LENGTH_LONG).show();
             } else if (data != null) {
-                Toast.makeText(MainActivity.this, data.toString(), Toast.LENGTH_SHORT).show();
+                BASE64Decoder decoder = new BASE64Decoder();
+                byte[] decodedBytes = decoder.decodeBuffer(data);
+                File file = new File(Environment.getExternalStorageDirectory().toString()+"/Download/" + "newfile.pdf");
+                FileOutputStream fop = new FileOutputStream(file);
+                fop.write(decodedBytes);
+                fop.flush();
+                fop.close();
             }
         }
 
