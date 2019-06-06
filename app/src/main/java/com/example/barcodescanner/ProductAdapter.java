@@ -2,10 +2,8 @@ package com.example.barcodescanner;
 
 import android.app.Activity;
 import android.content.Context;
-import android.nfc.Tag;
 import android.support.annotation.NonNull;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -19,24 +17,17 @@ import android.widget.Toast;
 import net.yslibrary.android.keyboardvisibilityevent.KeyboardVisibilityEvent;
 import net.yslibrary.android.keyboardvisibilityevent.KeyboardVisibilityEventListener;
 
-import org.w3c.dom.Text;
-
 import java.util.List;
 
-import static android.support.constraint.Constraints.TAG;
-
-public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductViewHolder>  {
+public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductViewHolder> {
 
     private Context mContext;
     private List<ProductItem> productItemList;
     private OnItemClickListener onItemClickListener;
     private Activity mActivity;
-    private TextView mTextView;
-    private ProductItem currentProduct;
-    private EditText mEditText;
 
     public ProductAdapter(final Context mContext, List<ProductItem> productItemList,
-                          OnItemClickListener onItemClickListener, final Activity  mActivity) {
+                          OnItemClickListener onItemClickListener, final Activity mActivity) {
         this.mContext = mContext;
         this.productItemList = productItemList;
         this.onItemClickListener = onItemClickListener;
@@ -67,7 +58,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ProductV
         KeyboardVisibilityEvent.setEventListener(mActivity, new KeyboardVisibilityEventListener() {
             @Override
             public void onVisibilityChanged(boolean isOpen) {
-                if(!isOpen) {
+                if (!isOpen) {
                     productViewHolder.editText.clearFocus();
                     productItem.setCount(productViewHolder.editText.getText().toString());
                 }

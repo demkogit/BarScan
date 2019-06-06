@@ -1,49 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+  xmlns:tools="http://schemas.android.com/tools"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:background="@drawable/backgorund_gradient"
+  android:orientation="vertical"
+  tools:context=".CreateProductActivity">
+
+  <LinearLayout
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="10dp"
-    tools:context=".CreateProductActivity">
+    android:layout_height="wrap_content"
+    android:padding="15dp"
+    android:background="@drawable/backgorund_gradient"
+    android:orientation="vertical">
 
     <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Логин:"
-        android:textColor="#000"
-        android:textSize="25dp" />
+      android:textStyle="bold"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Логин:"
+      android:textColor="#000"
+      android:textSize="25sp"/>
 
     <EditText
-        android:id="@+id/login"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Логин"
-        android:textSize="10pt" />
+      android:id="@+id/login"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="Логин"
+      android:textSize="10pt"/>
+
+  </LinearLayout>
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="15dp"
+    android:background="@drawable/backgorund_gradient"
+    android:orientation="vertical">
 
     <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Пароль:"
-        android:textColor="#000"
-        android:textSize="25dp" />
+      android:textStyle="bold"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Пароль:"
+      android:textColor="#000"
+      android:textSize="25sp"/>
 
     <EditText
-        android:id="@+id/pass"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Пароль"
-        android:imeOptions="actionDone"
-        android:inputType="textPassword"
-        android:maxLines="1"
-        android:singleLine="true"
-        android:textSize="10pt"
-        android:saveEnabled="false"/>
+      android:id="@+id/pass"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:hint="Пароль"
+      android:imeOptions="actionDone"
+      android:inputType="textPassword"
+      android:maxLines="1"
+      android:saveEnabled="false"
+      android:singleLine="true"
+      android:textSize="10pt"/>
 
-    <Button
-        android:id="@+id/saveLogPass"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Сохранить" />
+  </LinearLayout>
+
+  <Button
+    android:id="@+id/saveLogPass"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="10dp"
+    android:layout_gravity="center"
+    android:padding="15dp"
+    android:elevation="15dp"
+    android:background="@drawable/button_gradient"
+    android:text="Сохранить"
+    android:textColor="#ffff"
+    android:textSize="25dp"/>
 
 </LinearLayout>
